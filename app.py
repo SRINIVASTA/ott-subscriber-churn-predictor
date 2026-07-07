@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from imblearn.over_sampling import SMOTE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import streamlit as st
@@ -13,13 +12,13 @@ CONTENT_MAP = {"Global": 0, "Live Sports": 1, "Regional": 2}
 
 
 # =====================================================================
-# CACHED MACHINE LEARNING PIPELINE ENGINE
+# CACHED MACHINE LEARNING PIPELINE ENGINE (Bypasses imblearn)
 # =====================================================================
 @st.cache_resource
 def initialize_and_train_model():
-    """Generates synthetic data and trains the pipeline once, caching it
+    """Generates synthetic data and uses a native duplication method
 
-    internally to make user input slider changes instantaneous.
+    to handle class imbalances instead of using SMOTE, bypassing imblearn.
     """
     np.random.seed(42)
     records = 3000
@@ -57,21 +56,26 @@ def initialize_and_train_model():
         }
     )
 
-    X = df.drop("Churned", axis=1)
-    y = df["Churned"]
+    # NATIVE PURE-PYTHON REBALANCING STEP (Bypasses SMOTE)
+    # Isolate minority churn rows and duplicate them to match retained numbers safely
+    df_retained = df[df["Churned"] == 0]
+    df_churned = df[df["Churned"] == 1]
 
-    # Balance classes via SMOTE to address minority data gaps
-    smote = SMOTE(random_state=42)
-    X_resampled, y_resampled = smote.fit_resample(X, y)
+    # Oversample minority class using pandas sampling logic
+    df_churned_upsampled = df_churned.sample(len(df_retained), replace=True, random_state=42)
+    df_balanced = pd.concat([df_retained, df_churned_upsampled]).sample(frac=1, random_state=42)
+
+    X = df_balanced.drop("Churned", axis=1)
+    y = df_balanced["Churned"]
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_resampled)
+    X_scaled = scaler.fit_transform(X)
 
     # Fit best hyperparameters uncovered during cross-validation tuning
     model = RandomForestClassifier(
         n_estimators=150, max_depth=10, class_weight="balanced", random_state=42
     )
-    model.fit(X_scaled, y_resampled)
+    model.fit(X_scaled, y)
 
     return model, scaler, X.columns
 
@@ -141,7 +145,10 @@ with col_outputs:
 
         # Compute binary values and true mathematical probabilities
         prediction = model.predict(scaled_input)
-        probability = model.predict_proba(scaled_input)[0][1]
+        probability = model.predict_proba(scaled_input)
+
+        # Get probability of churn (class 1)
+        churn_prob = float(probability[0][1])
 
         # Metrics presentation layout columns
         m_col1, m_col2 = st.columns(2)
@@ -153,15 +160,15 @@ with col_outputs:
                 st.success("✅ RETAINED USER")
 
         with m_col2:
-            st.metric(label="Churn Probability", value=f"{probability:.2%}")
+            st.metric(label="Churn Probability", value=f"{churn_prob:.2%}")
 
         # Prescriptive Action Strategy Block
         st.markdown("**Recommended Next Steps:**")
-        if probability > 0.75:
+        if churn_prob > 0.75:
             st.warning(
                 "Dispatch an immediate hyper-targeted discount promo code or high-value regional package offer."
             )
-        elif probability > 0.45:
+        elif churn_prob > 0.45:
             st.info(
                 "Trigger direct mobile push notifications highlighting trending content releases inside their category choice."
             )
