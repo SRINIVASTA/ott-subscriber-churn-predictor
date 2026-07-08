@@ -16,9 +16,9 @@ CONTENT_MAP = {"Global": 0, "Live Sports": 1, "Regional": 2}
 # =====================================================================
 @st.cache_resource
 def initialize_and_train_model():
-    """Generates synthetic data and uses a native duplication method
+    """Generates synthetic data using explicit mathematical logic
 
-    to handle class imbalances instead of using SMOTE, bypassing imblearn.
+    rules to train a Random Forest model on clear telemetry behaviors.
     """
     np.random.seed(42)
     records = 3000
@@ -30,19 +30,31 @@ def initialize_and_train_model():
     content_pref = np.random.choice(list(CONTENT_MAP.keys()), records)
 
     churn_labels = []
-    for wh, cost, tenure in zip(watch_hours, monthly_cost, tenure_months):
-        risk_score = 0.1
+    for wh, cost, tenure, pref in zip(watch_hours, monthly_cost, tenure_months, content_pref):
+        risk_score = 0.1  # Baseline risk
+        
+        # 1. Watch Time Math Rules
         if wh < 20:
             risk_score += 0.5
         elif wh < 50:
             risk_score += 0.2
+            
+        # 2. Cost vs Tenure Rule
         if cost > 400 and tenure < 6:
             risk_score += 0.4
+            
+        # 3. Loyalty Discount Rule
         if tenure > 24:
             risk_score -= 0.3
+            
+        # 4. Content Preference Math Rules
+        if pref == "Live Sports":
+            risk_score += 0.15
+        elif pref == "Regional":
+            risk_score -= 0.10
 
         # Injecting natural human variance noise
-        risk_score += np.random.normal(0, 0.15)
+        risk_score += np.random.normal(0, 0.05)
         churn_labels.append(1 if risk_score > 0.45 else 0)
 
     # Convert arrays directly to processing dataframes
@@ -166,33 +178,54 @@ with col_outputs:
 st.markdown("---")
 
 # =====================================================================
-# INTERACTIVE DATA GRAPHING SECTION (Dynamic Input Impact Layout)
+# INTERACTIVE DATA GRAPHING SECTION (Exact Mathematical Risk Contribution)
 # =====================================================================
-st.subheader("🔮 Behind the Algorithm: Operational Churn Signals")
+st.subheader("🔮 Behind the Algorithm: Mathematical Risk Breakdown")
 st.write(
-    f"This interactive chart displays how your current inputs—including your selection of **{content_preference}**—scale relative to maximum operational limits."
+    f"This chart displays the exact mathematical risk vectors added or subtracted based on your slider settings and your choice of **{content_preference}**."
 )
 
-# Normalize current input metrics to a 0-1 scale to visualize their relative active footprint
-scaled_contributions = {
-    "Watch Time Footprint": watch_hours / 200.0,
-    "Cost Weight": monthly_cost / 1000.0,
-    "Tenure Longevity": tenure_months / 60.0,
-    "Catalog Focus Matrix": (CONTENT_MAP[content_preference] + 1) / 3.0  # Maps 0, 1, 2 to distinct visual steps
-}
+# 1. Compute exact mathematical risk components mimicking your dataset logic
+watch_risk = 0.5 if watch_hours < 20 else (0.2 if watch_hours < 50 else 0.0)
+cost_tenure_risk = 0.4 if (monthly_cost > 400 and tenure_months < 6) else 0.0
+loyalty_discount = -0.3 if tenure_months > 24 else 0.0
 
-# Convert to DataFrame for chart consumption
-user_impact_df = pd.DataFrame(
+# 2. Compute exact mathematical contribution of chosen content preferences
+if content_preference == "Live Sports":
+    content_risk = 0.15
+elif content_preference == "Regional":
+    content_risk = -0.10
+else:
+    content_risk = 0.0  # Global acts as the mathematical control baseline
+
+# Create the mathematical dataset for the visualization chart
+mathematical_risk_df = pd.DataFrame(
     {
-        "Subscriber Metric": list(scaled_contributions.keys()),
-        "Relative Vector Value": list(scaled_contributions.values()),
+        "Risk Vector Component": [
+            "Base Subscriber Risk",
+            "Low Watch Time Penalty",
+            "High Cost / Low Tenure Penalty",
+            "Long-Term Loyalty Discount",
+            f"Catalog Focus ({content_preference})",
+        ],
+        "Mathematical Score Impact": [
+            0.1, 
+            watch_risk, 
+            cost_tenure_risk, 
+            loyalty_discount, 
+            content_risk
+        ],
     }
-).sort_values(by="Relative Vector Value", ascending=False)
+)
 
-# Render native, clean, interactive Streamlit bar chart
+# Render the mathematically precise bar chart
 st.bar_chart(
-    data=user_impact_df,
-    x="Subscriber Metric",
-    y="Relative Vector Value",
+    data=mathematical_risk_df,
+    x="Risk Vector Component",
+    y="Mathematical Score Impact",
     use_container_width=True,
 )
+
+# Display the net calculated risk score summary matrix
+net_score = mathematical_risk_df["Mathematical Score Impact"].sum()
+st.info(f"🧮 **Total Core Mathematical Risk Score:** {net_score:.2f} *(Threshold for high risk flags is > 0.45)*")
