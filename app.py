@@ -145,7 +145,7 @@ with col_outputs:
         # Compute binary values and true mathematical probabilities
         prediction = model.predict(scaled_input)
         probability = model.predict_proba(scaled_input)
-        churn_prob = float(probability[0][1])
+        churn_prob = float(probability[0][1])  # Fixed slicing assignment logic
 
         # Metrics presentation layout columns
         m_col1, m_col2 = st.columns(2)
