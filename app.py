@@ -5,14 +5,14 @@ from sklearn.preprocessing import StandardScaler
 import streamlit as st
 
 # Set page configuration layout
-st.set_page_config(page_title="OTT Churn Predictor", layout="centered")
+st.set_page_config(page_title="OTT Churn Predictor", layout="wide")
 
 # Hardcoded reference map for categorical conversions
 CONTENT_MAP = {"Global": 0, "Live Sports": 1, "Regional": 2}
 
 
 # =====================================================================
-# CACHED MACHINE LEARNING PIPELINE ENGINE (Bypasses imblearn)
+# CACHED MACHINE LEARNING PIPELINE ENGINE
 # =====================================================================
 @st.cache_resource
 def initialize_and_train_model():
@@ -57,7 +57,6 @@ def initialize_and_train_model():
     )
 
     # NATIVE PURE-PYTHON REBALANCING STEP (Bypasses SMOTE)
-    # Isolate minority churn rows and duplicate them to match retained numbers safely
     df_retained = df[df["Churned"] == 0]
     df_churned = df[df["Churned"] == 1]
 
@@ -77,7 +76,7 @@ def initialize_and_train_model():
     )
     model.fit(X_scaled, y)
 
-    return model, scaler, X.columns
+    return model, scaler, list(X.columns)
 
 
 # Execute initialization
@@ -94,44 +93,20 @@ st.write(
 st.markdown("---")
 
 # Layout Configuration: Split Screen into Input Sidebar Elements and Center Analytics
-col_inputs, col_spacer, col_outputs = st.columns([1.1, 0.1, 1.1])
+col_inputs, col_spacer, col_outputs = st.columns([1.2, 0.1, 1.2])
 
 with col_inputs:
     st.subheader("👤 User Behavior Inputs")
 
     # Interactive User Widgets
     watch_hours = st.slider(
-        "Monthly Watch Time (Hours)",
-        min_value=1.0,
-        max_value=200.0,
-        value=15.0,
-        step=0.5,
+        "Monthly Watch Time (Hours)", min_value=1.0, max_value=200.0, value=15.0, step=0.5
     )
     monthly_cost = st.slider(
-        "Monthly Subscription Cost (INR)",
-        min_value=50,
-        max_value=1000,
-        value=649,
-        step=10,
+        "Monthly Subscription Cost (INR)", min_value=50, max_value=1000, value=649, step=10
     )
-    tenure_months = st.slider(
-        "Account Tenure (Months)", min_value=1, max_value=60, value=3
-    )
-    content_preference = st.selectbox(
-        "Preferred Catalog Content Type", list(CONTENT_MAP.keys())
-    )
-
-    # Convert active user configuration inputs to evaluation dataframe formats
-    input_data = pd.DataFrame(
-        [
-            {
-                "Watch_Hours_Monthly": watch_hours,
-                "Monthly_Cost_INR": monthly_cost,
-                "Tenure_Months": tenure_months,
-                "Content_Preference": CONTENT_MAP[content_preference],
-            }
-        ]
-    )
+    tenure_months = st.slider("Account Tenure (Months)", min_value=1, max_value=60, value=3)
+    content_preference = st.selectbox("Preferred Catalog Content Type", list(CONTENT_MAP.keys()))
 
     # Trigger action button
     run_analysis = st.button("Analyze Subscriber Churn Risk", type="primary")
@@ -140,14 +115,25 @@ with col_outputs:
     st.subheader("📊 Algorithmic Evaluation")
 
     if run_analysis:
-        # Apply global processing configurations
+        # Convert active user configuration inputs to evaluation dataframe formats safely
+        input_data = pd.DataFrame(
+            [
+                {
+                    "Watch_Hours_Monthly": watch_hours,
+                    "Monthly_Cost_INR": monthly_cost,
+                    "Tenure_Months": tenure_months,
+                    "Content_Preference": CONTENT_MAP[content_preference],
+                }
+            ]
+        )
+
+        # Enforce strict column alignment to match scaler criteria perfectly
+        input_data = input_data[feature_names]
         scaled_input = scaler.transform(input_data)
 
         # Compute binary values and true mathematical probabilities
         prediction = model.predict(scaled_input)
         probability = model.predict_proba(scaled_input)
-
-        # Get probability of churn (class 1)
         churn_prob = float(probability[0][1])
 
         # Metrics presentation layout columns
@@ -173,31 +159,40 @@ with col_outputs:
                 "Trigger direct mobile push notifications highlighting trending content releases inside their category choice."
             )
         else:
-            st.success(
-                "Maintain automated general update streams. User shows positive health signs."
-            )
+            st.success("Maintain automated general update streams. User shows positive health signs.")
     else:
         st.info("👈 Adjust sliders and click the button to generate prediction telemetry.")
 
 st.markdown("---")
 
 # =====================================================================
-# INTERACTIVE DATA GRAPHING SECTION (Feature Importance Layout)
+# INTERACTIVE DATA GRAPHING SECTION (Dynamic Input Impact Layout)
 # =====================================================================
 st.subheader("🔮 Behind the Algorithm: Operational Churn Signals")
 st.write(
-    "This interactive chart displays exactly which behavioral metrics the model values most when calculating churn scores."
+    f"This interactive chart displays how your current inputs—including your selection of **{content_preference}**—scale relative to maximum operational limits."
 )
 
-# Extract Gini importance vectors dynamically from the Random Forest model
-importance_df = pd.DataFrame(
-    {"Behavioral Metric": feature_names, "Signal Importance": model.feature_importances_}
-).sort_values(by="Signal Importance", ascending=False)
+# Normalize current input metrics to a 0-1 scale to visualize their relative active footprint
+scaled_contributions = {
+    "Watch Time Footprint": watch_hours / 200.0,
+    "Cost Weight": monthly_cost / 1000.0,
+    "Tenure Longevity": tenure_months / 60.0,
+    "Catalog Focus Matrix": (CONTENT_MAP[content_preference] + 1) / 3.0  # Maps 0, 1, 2 to distinct visual steps
+}
+
+# Convert to DataFrame for chart consumption
+user_impact_df = pd.DataFrame(
+    {
+        "Subscriber Metric": list(scaled_contributions.keys()),
+        "Relative Vector Value": list(scaled_contributions.values()),
+    }
+).sort_values(by="Relative Vector Value", ascending=False)
 
 # Render native, clean, interactive Streamlit bar chart
 st.bar_chart(
-    data=importance_df,
-    x="Behavioral Metric",
-    y="Signal Importance",
+    data=user_impact_df,
+    x="Subscriber Metric",
+    y="Relative Vector Value",
     use_container_width=True,
 )
