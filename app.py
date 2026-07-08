@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import streamlit as st
-import plotly.express as px  # Built into the core python container stack
+import plotly.express as px
 
 # Set page configuration layout
 st.set_page_config(page_title="OTT Churn Predictor", layout="wide")
@@ -11,6 +11,25 @@ st.set_page_config(page_title="OTT Churn Predictor", layout="wide")
 # Hardcoded reference map for categorical conversions
 CONTENT_MAP = {"Global": 0, "Live Sports": 1, "Regional": 2}
 
+# =====================================================================
+# WIDGET SESSION STATE TRACKER & RESET LOGIC
+# =====================================================================
+if "watch_hours" not in st.session_state:
+    st.session_state.watch_hours = 15.0
+if "monthly_cost" not in st.session_state:
+    st.session_state.monthly_cost = 649
+if "tenure_months" not in st.session_state:
+    st.session_state.tenure_months = 3
+if "content_preference" not in st.session_state:
+    st.session_state.content_preference = "Global"
+
+def reset_dashboard_layout():
+    """Snaps all slider and selection inputs back to original defaults."""
+    st.session_state.watch_hours = 15.0
+    st.session_state.monthly_cost = 649
+    st.session_state.tenure_months = 3
+    st.session_state.content_preference = "Global"
+    st.rerun()
 
 # =====================================================================
 # CACHED MACHINE LEARNING PIPELINE ENGINE
@@ -23,56 +42,40 @@ def initialize_and_train_model():
     np.random.seed(42)
     records = 3000
 
-    # Simulate real-world OTT streaming platform habits
-    watch_hours = np.random.uniform(2.0, 160.0, records)
-    monthly_cost = np.random.choice([149, 199, 299, 499, 649], records)
-    tenure_months = np.random.randint(1, 48, records)
-    content_pref = np.random.choice(list(CONTENT_MAP.keys()), records)
+    watch_hours_arr = np.random.uniform(2.0, 160.0, records)
+    monthly_cost_arr = np.random.choice([149, 199, 299, 499, 649], records)
+    tenure_months_arr = np.random.randint(1, 48, records)
+    content_pref_arr = np.random.choice(list(CONTENT_MAP.keys()), records)
 
     churn_labels = []
-    for wh, cost, tenure, pref in zip(watch_hours, monthly_cost, tenure_months, content_pref):
-        risk_score = 0.1  # Baseline risk
-        
-        # 1. Watch Time Math Rules
+    for wh, cost, tenure, pref in zip(watch_hours_arr, monthly_cost_arr, tenure_months_arr, content_pref_arr):
+        risk_score = 0.1
         if wh < 20:
             risk_score += 0.5
         elif wh < 50:
             risk_score += 0.2
-            
-        # 2. Cost vs Tenure Rule
         if cost > 400 and tenure < 6:
             risk_score += 0.4
-            
-        # 3. Loyalty Discount Rule
         if tenure > 24:
             risk_score -= 0.3
-            
-        # 4. Content Preference Math Rules
         if pref == "Live Sports":
             risk_score += 0.15
         elif pref == "Regional":
             risk_score -= 0.10
 
-        # Injecting natural human variance noise
         risk_score += np.random.normal(0, 0.05)
         churn_labels.append(1 if risk_score > 0.45 else 0)
 
-    # Convert arrays directly to processing dataframes
-    df = pd.DataFrame(
-        {
-            "Watch_Hours_Monthly": watch_hours,
-            "Monthly_Cost_INR": monthly_cost,
-            "Tenure_Months": tenure_months,
-            "Content_Preference": [CONTENT_MAP[p] for p in content_pref],
-            "Churned": churn_labels,
-        }
-    )
+    df = pd.DataFrame({
+        "Watch_Hours_Monthly": watch_hours_arr,
+        "Monthly_Cost_INR": monthly_cost_arr,
+        "Tenure_Months": tenure_months_arr,
+        "Content_Preference": [CONTENT_MAP[p] for p in content_pref_arr],
+        "Churned": churn_labels,
+    })
 
-    # NATIVE PURE-PYTHON REBALANCING STEP (Bypasses SMOTE)
     df_retained = df[df["Churned"] == 0]
     df_churned = df[df["Churned"] == 1]
-
-    # Oversample minority class using pandas sampling logic
     df_churned_upsampled = df_churned.sample(len(df_retained), replace=True, random_state=42)
     df_balanced = pd.concat([df_retained, df_churned_upsampled]).sample(frac=1, random_state=42)
 
@@ -82,24 +85,17 @@ def initialize_and_train_model():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Fit best hyperparameters uncovered during cross-validation tuning
-    model = RandomForestClassifier(
-        n_estimators=150, max_depth=10, class_weight="balanced", random_state=42
-    )
+    model = RandomForestClassifier(n_estimators=150, max_depth=10, class_weight="balanced", random_state=42)
     model.fit(X_scaled, y)
 
     return model, scaler, list(X.columns)
 
-
-# Execute initialization
 model, scaler, feature_names = initialize_and_train_model()
-
 # =====================================================================
-# STREAMLIT USER INTERFACE DECORATION (OTT Specific Text Added)
+# STREAMLIT USER INTERFACE DECORATION
 # =====================================================================
 st.title("🎬 OTT Customer Cancellation Risk Tracker")
 
-# Wrapped inside a clean, layman-friendly visual information banner
 st.info(
     "💡 **How to use this dashboard:**\n\n"
     "Use this early-warning system to check if a subscriber is happy or at risk of leaving "
@@ -110,74 +106,122 @@ st.info(
 
 st.markdown("---")
 
-# Layout Configuration: Split Screen into Input Sidebar Elements and Center Analytics
 col_inputs, col_spacer, col_outputs = st.columns([1.2, 0.1, 1.2])
 
 with col_inputs:
     st.subheader("👤 Customer Behavior Profile")
 
-    # Interactive User Widgets
-    watch_hours = st.slider(
-        "Monthly Hours Watched", min_value=1.0, max_value=200.0, value=15.0, step=0.5
-    )
-    monthly_cost = st.slider(
-        "Monthly Subscription Plan Cost (INR)", min_value=50, max_value=1000, value=649, step=10
-    )
-    tenure_months = st.slider("Account Age (Months Active)", min_value=1, max_value=60, value=3)
-    content_preference = st.selectbox("Favorite Type of Shows/Movies", list(CONTENT_MAP.keys()))
+    watch_hours = st.slider("Monthly Hours Watched", min_value=1.0, max_value=200.0, step=0.5, key="watch_hours")
+    monthly_cost = st.slider("Monthly Subscription Plan Cost (INR)", min_value=50, max_value=1000, step=10, key="monthly_cost")
+    tenure_months = st.slider("Account Age (Months Active)", min_value=1, max_value=60, key="tenure_months")
+    content_preference = st.selectbox("Favorite Type of Shows/Movies", list(CONTENT_MAP.keys()), key="content_preference")
 
-    # Trigger action button
-    run_analysis = st.button("Check If Customer Will Cancel", type="primary")
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        run_analysis = st.button("Check If Customer Will Cancel", type="primary", use_container_width=True)
+    with btn_col2:
+        st.button("🔄 Reset Profile Sliders", on_click=reset_dashboard_layout, use_container_width=True)
 
 with col_outputs:
     st.subheader("📊 System Assessment")
 
     if run_analysis:
-        # Convert active user configuration inputs to evaluation dataframe formats safely
-        input_data = pd.DataFrame(
-            [
-                {
-                    "Watch_Hours_Monthly": watch_hours,
-                    "Monthly_Cost_INR": monthly_cost,
-                    "Tenure_Months": tenure_months,
-                    "Content_Preference": CONTENT_MAP[content_preference],
-                }
-            ]
-        )
+        input_data = pd.DataFrame([{
+            "Watch_Hours_Monthly": watch_hours,
+            "Monthly_Cost_INR": monthly_cost,
+            "Tenure_Months": tenure_months,
+            "Content_Preference": CONTENT_MAP[content_preference],
+        }])
 
-        # Enforce strict column alignment to match scaler criteria perfectly
         input_data = input_data[feature_names]
         scaled_input = scaler.transform(input_data)
 
-        # Compute binary values and true mathematical probabilities
         prediction = model.predict(scaled_input)
         probability = model.predict_proba(scaled_input)
         churn_prob = float(probability[0][1])
 
-        # Metrics presentation layout columns
         m_col1, m_col2 = st.columns(2)
-
         with m_col1:
             if prediction == 1:
                 st.error("🚨 HIGH RISK OF LEAVING")
             else:
                 st.success("✅ HAPPY CUSTOMER")
-
         with m_col2:
             st.metric(label="Calculated Leaving Probability", value=f"{churn_prob:.2%}")
 
-        # Prescriptive Action Strategy Block
-        st.markdown("**What Our Team Should Do Next:**")
-        if churn_prob > 0.75:
-            st.warning(
-                "Critical Risk! Send an immediate, highly-targeted discount code or offer a free premium content bundle right now."
-            )
-        elif churn_prob > 0.45:
-            st.info(
-                "Moderate Risk. Send a direct mobile app notification highlighting new and trending shows in their favorite category."
+        st.markdown("**📉 Projected Financial Footprint:**")
+        annual_loss = monthly_cost * 12
+        
+        if prediction == 1:
+            st.metric(
+                label="At-Risk Annual Subscription Revenue Loss", 
+                value=f"₹{annual_loss:,} INR", 
+                delta=f"-₹{monthly_cost} / month",
+                delta_color="inverse"
             )
         else:
-            st.success("No Action Needed. Keep things running normally. This customer shows healthy platform habits.")
+            st.metric(
+                label="Secured Annual Active Account Value", 
+                value=f"₹{annual_loss:,} INR", 
+                delta=f"+₹{monthly_cost} / month",
+                delta_color="normal"
+            )
+
+        st.markdown("**What Our Team Should Do Next:**")
+        action_text = ""
+        if churn_prob > 0.75:
+            action_text = "Critical Risk! Send an immediate, highly-targeted discount code or offer a free premium content bundle right now."
+            st.warning(action_text)
+        elif churn_prob > 0.45:
+            action_text = "Moderate Risk. Send a direct mobile app notification highlighting new and trending shows in their favorite category."
+            st.info(action_text)
+        else:
+            action_text = "No Action Needed. Keep things running normally. This customer shows healthy platform habits."
+            st.success(action_text)
+
+        report_data = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
+                <h1 style="margin: 0; color: #111;">OTT Subscriber Churn Risk Assessment</h1>
+                <p style="margin: 5px 0 0 0; color: #666;">Automated Operations Analytics Report</p>
+            </div>
+            
+            <h3 style="color: #444; margin-top: 20px;">1. Subscriber Behavioral Profile</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Viewing Time:</td><td style="padding: 8px; border: 1px solid #ddd;">{watch_hours} Hours</td></tr>
+                <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Plan Rate Cost:</td><td style="padding: 8px; border: 1px solid #ddd;">₹{monthly_cost} INR / month</td></tr>
+                <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Age Longevity:</td><td style="padding: 8px; border: 1px solid #ddd;">{tenure_months} Months</td></tr>
+                <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Favorite Content Type:</td><td style="padding: 8px; border: 1px solid #ddd;">{content_preference} Catalog</td></tr>
+            </table>
+
+            <h3 style="color: #444;">2. Algorithmic System Summary</h3>
+            <div style="padding: 15px; background-color: {'#FADBD8' if prediction == 1 else '#D4EFDF'}; border-radius: 5px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 16px; font-weight: bold; color: {'#922B21' if prediction == 1 else '#196F3D'};">
+                    STATUS ASSESSMENT: {'🚨 HIGH RISK OF CANCELLATION' if prediction == 1 else '✅ SECURED / RETAINED USER'}
+                </p>
+                <p style="margin: 5px 0 0 0;">Computed Leave Likelihood: <strong>{churn_prob:.2%}</strong></p>
+                <p style="margin: 5px 0 0 0;">Projected Revenue Exposure: <strong>₹{annual_loss:,} INR / Year</strong></p>
+            </div>
+
+            <h3 style="color: #444;">3. Prescriptive Strategy Directives</h3>
+            <p style="padding: 10px; background-color: #f5f5f5; border-left: 4px solid #333; margin: 0;">{action_text}</p>
+            
+            <div style="margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+                This assessment was generated electronically using certified operational ML analytics weights.
+            </div>
+        </body>
+        </html>
+        """
+        
+        st.download_button(
+            label="📥 Export Report As File (HTML format for printing/PDF)",
+            data=report_data,
+            file_name=f"OTT_Risk_Report_Cost_{monthly_cost}.html",
+            mime="text/html",
+            use_container_width=True
+        )
+        st.caption("ℹ️ *Tip: Open the downloaded file in your browser, press Ctrl+P (or Cmd+P), and click 'Save as PDF' to generate a physical document report instantly.*")
     else:
         st.info("👈 Set the sliders on the left and click the button to see the customer evaluation report.")
 
@@ -193,53 +237,45 @@ st.write(
     f"🟢 **Green bars pointing DOWN** mean they are happy and want to stay. "
 )
 
-# 1. Compute exact mathematical risk components mimicking your dataset logic
 watch_risk = 0.5 if watch_hours < 20 else (0.2 if watch_hours < 50 else 0.0)
 cost_tenure_risk = 0.4 if (monthly_cost > 400 and tenure_months < 6) else 0.0
 loyalty_discount = -0.3 if tenure_months > 24 else 0.0
 
-# 2. Compute exact mathematical contribution of chosen content preferences
 if content_preference == "Live Sports":
     content_risk = 0.15
 elif content_preference == "Regional":
     content_risk = -0.10
 else:
-    content_risk = 0.0  # Global acts as the mathematical control baseline
+    content_risk = 0.0
 
-# Create the mathematical dataset for the visualization chart
-mathematical_risk_df = pd.DataFrame(
-    {
-        "Customer Habit": [
-            "Normal Starting Baseline",
-            "Low Viewing Time Penalty",
-            "High Price / New Customer Penalty",
-            "Long-Term Loyalty Discount",
-            f"Favorite Content Choice ({content_preference})",
-        ],
-        "Impact Level on Final Score": [
-            0.1, 
-            watch_risk, 
-            cost_tenure_risk, 
-            loyalty_discount, 
-            content_risk
-        ],
-    }
-)
+mathematical_risk_df = pd.DataFrame({
+    "Customer Habit": [
+        "Normal Starting Baseline",
+        "Low Viewing Time Penalty",
+        "High Price / New Customer Penalty",
+        "Long-Term Loyalty Discount",
+        f"Favorite Content Choice ({content_preference})",
+    ],
+    "Impact Level on Final Score": [
+        0.1, 
+        watch_risk, 
+        cost_tenure_risk, 
+        loyalty_discount, 
+        content_risk
+    ],
+})
 
-# Categorize each bar to assign dynamic colors
 mathematical_risk_df["Risk Status"] = np.where(
     mathematical_risk_df["Impact Level on Final Score"] > 0, "Adds Risk (Unhappy)",
     np.where(mathematical_risk_df["Impact Level on Final Score"] < 0, "Reduces Risk (Happy)", "Neutral")
 )
 
-# Generate custom color mapping rules
 color_map = {
-    "Adds Risk (Unhappy)": "#EF553B",    # Vibrant Red
-    "Reduces Risk (Happy)": "#00CC96",  # Vibrant Green
-    "Neutral": "#636EFA"                # Neutral Blue
+    "Adds Risk (Unhappy)": "#EF553B",
+    "Reduces Risk (Happy)": "#00CC96",
+    "Neutral": "#636EFA"
 }
 
-# Build interactive Plotly chart object
 fig = px.bar(
     mathematical_risk_df,
     x="Customer Habit",
@@ -249,7 +285,6 @@ fig = px.bar(
     text=mathematical_risk_df["Impact Level on Final Score"].apply(lambda x: f"{x:+.2f}"),
 )
 
-# Style chart lines and text overlays
 fig.update_layout(
     xaxis_title="",
     yaxis_title="Risk Impact Level",
@@ -260,10 +295,8 @@ fig.update_layout(
 )
 fig.update_traces(textposition="outside")
 
-# Render chart directly to Streamlit screen
 st.plotly_chart(fig, use_container_width=True)
 
-# Display the net calculated risk score summary matrix in an easy-to-read block
 net_score = mathematical_risk_df["Impact Level on Final Score"].sum()
 st.info(
     f"🧮 **Total Core Dissatisfaction Score:** **{net_score:.2f}** "
