@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import streamlit as st
+import plotly.express as px  # Built into the core python container stack
 
 # Set page configuration layout
 st.set_page_config(page_title="OTT Churn Predictor", layout="wide")
@@ -22,7 +23,7 @@ def initialize_and_train_model():
     np.random.seed(42)
     records = 3000
 
-    # Simulate messy real-world OTT telemetry distributions
+    # Simulate real-world streaming platform habits
     watch_hours = np.random.uniform(2.0, 160.0, records)
     monthly_cost = np.random.choice([149, 199, 299, 499, 649], records)
     tenure_months = np.random.randint(1, 48, records)
@@ -96,9 +97,10 @@ model, scaler, feature_names = initialize_and_train_model()
 # =====================================================================
 # STREAMLIT USER INTERFACE DECORATION
 # =====================================================================
-st.title("🎬 OTT Subscriber Churn Analytics")
+st.title("🎬 Customer Cancellation Risk Tracker")
 st.write(
-    "Adjust subscriber behavior vectors using the sliders below to predict churn risks instantly."
+    "Use this early-warning system to check if a subscriber is happy or at risk of leaving our video streaming platform. "
+    "Adjust the sliders on the left to match a customer's profile and see an instant risk assessment."
 )
 
 st.markdown("---")
@@ -107,23 +109,23 @@ st.markdown("---")
 col_inputs, col_spacer, col_outputs = st.columns([1.2, 0.1, 1.2])
 
 with col_inputs:
-    st.subheader("👤 User Behavior Inputs")
+    st.subheader("👤 Customer Behavior Profile")
 
     # Interactive User Widgets
     watch_hours = st.slider(
-        "Monthly Watch Time (Hours)", min_value=1.0, max_value=200.0, value=15.0, step=0.5
+        "Monthly Hours Watched", min_value=1.0, max_value=200.0, value=15.0, step=0.5
     )
     monthly_cost = st.slider(
-        "Monthly Subscription Cost (INR)", min_value=50, max_value=1000, value=649, step=10
+        "Monthly Subscription Plan Cost (INR)", min_value=50, max_value=1000, value=649, step=10
     )
-    tenure_months = st.slider("Account Tenure (Months)", min_value=1, max_value=60, value=3)
-    content_preference = st.selectbox("Preferred Catalog Content Type", list(CONTENT_MAP.keys()))
+    tenure_months = st.slider("Account Age (Months Active)", min_value=1, max_value=60, value=3)
+    content_preference = st.selectbox("Favorite Type of Shows/Movies", list(CONTENT_MAP.keys()))
 
     # Trigger action button
-    run_analysis = st.button("Analyze Subscriber Churn Risk", type="primary")
+    run_analysis = st.button("Check If Customer Will Cancel", type="primary")
 
 with col_outputs:
-    st.subheader("📊 Algorithmic Evaluation")
+    st.subheader("📊 System Assessment")
 
     if run_analysis:
         # Convert active user configuration inputs to evaluation dataframe formats safely
@@ -145,43 +147,45 @@ with col_outputs:
         # Compute binary values and true mathematical probabilities
         prediction = model.predict(scaled_input)
         probability = model.predict_proba(scaled_input)
-        churn_prob = float(probability[0][1])  # Fixed slicing assignment logic
+        churn_prob = float(probability[0][1])
 
         # Metrics presentation layout columns
         m_col1, m_col2 = st.columns(2)
 
         with m_col1:
             if prediction == 1:
-                st.error("🚨 HIGH CHURN RISK")
+                st.error("🚨 HIGH RISK OF LEAVING")
             else:
-                st.success("✅ RETAINED USER")
+                st.success("✅ HAPPY CUSTOMER")
 
         with m_col2:
-            st.metric(label="Churn Probability", value=f"{churn_prob:.2%}")
+            st.metric(label="Calculated Leaving Probability", value=f"{churn_prob:.2%}")
 
         # Prescriptive Action Strategy Block
-        st.markdown("**Recommended Next Steps:**")
+        st.markdown("**What Our Team Should Do Next:**")
         if churn_prob > 0.75:
             st.warning(
-                "Dispatch an immediate hyper-targeted discount promo code or high-value regional package offer."
+                "Critical Risk! Send an immediate, highly-targeted discount code or offer a free premium content bundle right now."
             )
         elif churn_prob > 0.45:
             st.info(
-                "Trigger direct mobile push notifications highlighting trending content releases inside their category choice."
+                "Moderate Risk. Send a direct mobile app notification highlighting new and trending shows in their favorite category."
             )
         else:
-            st.success("Maintain automated general update streams. User shows positive health signs.")
+            st.success("No Action Needed. Keep things running normally. This customer shows healthy platform habits.")
     else:
-        st.info("👈 Adjust sliders and click the button to generate prediction telemetry.")
+        st.info("👈 Set the sliders on the left and click the button to see the customer evaluation report.")
 
 st.markdown("---")
 
 # =====================================================================
-# INTERACTIVE DATA GRAPHING SECTION (Exact Mathematical Risk Contribution)
+# INTERACTIVE DATA GRAPHING SECTION (Layman-Friendly Risk Breakdown)
 # =====================================================================
-st.subheader("🔮 Behind the Algorithm: Mathematical Risk Breakdown")
+st.subheader("🔮 What is Driving this Customer's Decisions?")
 st.write(
-    f"This chart displays the exact mathematical risk vectors added or subtracted based on your slider settings and your choice of **{content_preference}**."
+    f"This chart breaks down the customer's active habits into positive and negative risk bars. "
+    f"🔴 **Red bars pointing UP** mean the customer is unhappy and more likely to quit. "
+    f"🟢 **Green bars pointing DOWN** mean they are happy and want to stay. "
 )
 
 # 1. Compute exact mathematical risk components mimicking your dataset logic
@@ -200,14 +204,14 @@ else:
 # Create the mathematical dataset for the visualization chart
 mathematical_risk_df = pd.DataFrame(
     {
-        "Risk Vector Component": [
-            "Base Subscriber Risk",
-            "Low Watch Time Penalty",
-            "High Cost / Low Tenure Penalty",
+        "Customer Habit": [
+            "Normal Starting Baseline",
+            "Low Viewing Time Penalty",
+            "High Price / New Customer Penalty",
             "Long-Term Loyalty Discount",
-            f"Catalog Focus ({content_preference})",
+            f"Favorite Content Choice ({content_preference})",
         ],
-        "Mathematical Score Impact": [
+        "Impact Level on Final Score": [
             0.1, 
             watch_risk, 
             cost_tenure_risk, 
@@ -217,14 +221,46 @@ mathematical_risk_df = pd.DataFrame(
     }
 )
 
-# Render the mathematically precise bar chart
-st.bar_chart(
-    data=mathematical_risk_df,
-    x="Risk Vector Component",
-    y="Mathematical Score Impact",
-    use_container_width=True,
+# Categorize each bar to assign dynamic colors
+mathematical_risk_df["Risk Status"] = np.where(
+    mathematical_risk_df["Impact Level on Final Score"] > 0, "Adds Risk (Unhappy)",
+    np.where(mathematical_risk_df["Impact Level on Final Score"] < 0, "Reduces Risk (Happy)", "Neutral")
 )
 
-# Display the net calculated risk score summary matrix
-net_score = mathematical_risk_df["Mathematical Score Impact"].sum()
-st.info(f"🧮 **Total Core Mathematical Risk Score:** {net_score:.2f} *(Threshold for high risk flags is > 0.45)*")
+# Generate custom color mapping rules
+color_map = {
+    "Adds Risk (Unhappy)": "#EF553B",    # Vibrant Layman Red
+    "Reduces Risk (Happy)": "#00CC96",  # Vibrant Layman Green
+    "Neutral": "#636EFA"                # Neutral Blue
+}
+
+# Build interactive Plotly chart object
+fig = px.bar(
+    mathematical_risk_df,
+    x="Customer Habit",
+    y="Impact Level on Final Score",
+    color="Risk Status",
+    color_discrete_map=color_map,
+    text=mathematical_risk_df["Impact Level on Final Score"].apply(lambda x: f"{x:+.2f}"),
+)
+
+# Style chart lines and text overlays
+fig.update_layout(
+    xaxis_title="",
+    yaxis_title="Risk Impact Level",
+    showlegend=True,
+    legend_title_text="Behavior Type",
+    margin=dict(l=20, r=20, t=20, b=20),
+    height=450
+)
+fig.update_traces(textposition="outside")
+
+# Render chart directly to Streamlit screen
+st.plotly_chart(fig, use_container_width=True)
+
+# Display the net calculated risk score summary matrix in an easy-to-read block
+net_score = mathematical_risk_df["Impact Level on Final Score"].sum()
+st.info(
+    f"🧮 **Total Core Dissatisfaction Score:** **{net_score:.2f}** "
+    f"*(If this final number goes over **0.45**, the system flags the customer as a high risk of leaving).* "
+)
