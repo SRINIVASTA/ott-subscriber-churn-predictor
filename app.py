@@ -23,7 +23,7 @@ def initialize_and_train_model():
     np.random.seed(42)
     records = 3000
 
-    # Simulate real-world streaming platform habits
+    # Simulate real-world OTT streaming platform habits
     watch_hours = np.random.uniform(2.0, 160.0, records)
     monthly_cost = np.random.choice([149, 199, 299, 499, 649], records)
     tenure_months = np.random.randint(1, 48, records)
@@ -95,12 +95,17 @@ def initialize_and_train_model():
 model, scaler, feature_names = initialize_and_train_model()
 
 # =====================================================================
-# STREAMLIT USER INTERFACE DECORATION
+# STREAMLIT USER INTERFACE DECORATION (OTT Specific Text Added)
 # =====================================================================
-st.title("🎬 Customer Cancellation Risk Tracker")
-st.write(
-    "Use this early-warning system to check if a subscriber is happy or at risk of leaving our video streaming platform. "
-    "Adjust the sliders on the left to match a customer's profile and see an instant risk assessment."
+st.title("🎬 OTT Customer Cancellation Risk Tracker")
+
+# Wrapped inside a clean, layman-friendly visual information banner
+st.info(
+    "💡 **How to use this dashboard:**\n\n"
+    "Use this early-warning system to check if a subscriber is happy or at risk of leaving "
+    "our OTT video streaming platform. Simply adjust the customer behavior sliders on the left "
+    "to match an active subscriber's profile, then click the evaluation button to view an "
+    "instant mathematical risk assessment."
 )
 
 st.markdown("---")
@@ -229,8 +234,8 @@ mathematical_risk_df["Risk Status"] = np.where(
 
 # Generate custom color mapping rules
 color_map = {
-    "Adds Risk (Unhappy)": "#EF553B",    # Vibrant Layman Red
-    "Reduces Risk (Happy)": "#00CC96",  # Vibrant Layman Green
+    "Adds Risk (Unhappy)": "#EF553B",    # Vibrant Red
+    "Reduces Risk (Happy)": "#00CC96",  # Vibrant Green
     "Neutral": "#636EFA"                # Neutral Blue
 }
 
