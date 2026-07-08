@@ -17,7 +17,6 @@ CONTENT_MAP = {"Global": 0, "Live Sports": 1, "Regional": 2}
 @st.cache_resource
 def initialize_and_train_model():
     """Generates synthetic data using explicit mathematical logic
-
     rules to train a Random Forest model on clear telemetry behaviors.
     """
     np.random.seed(42)
